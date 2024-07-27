@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  spark2:
+    image: bitnami/spark:3.4.1
+    container_name: spark2
+    ports:
+      - "4041:4040"  # Spark UI
+    environment:
+      SPARK_MODE: "master"
+      SPARK_MASTER_URL: "spark://spark:7077"
+    #depends_on:
+    #  - kafka1
+    #  - kafka2
+    #  - kafka3
+    volumes:
+      - /home/pubudu/vernemq_config/apache-elastic-search-job.py:/opt/spark-apps/apache-elastic-search-job.py
+      - /home/pubudu/vernemq_config/spark-checkpoints2:/opt/spark-apps/spark-checkpoints
+      - /home/pubudu/vernemq_config/spark-checkpoints/es:/opt/spark-apps/spark-checkpoints/es

@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  spark:
+    image: bitnami/spark:3.4.1
+    container_name: spark
+    ports:
+      - "4040:4040"  # Spark UI
+    environment:
+      SPARK_MODE: "master"
+      SPARK_MASTER_URL: "spark://spark:7077"
+    volumes:
+      - /home/pubudu/vernemq_config/apache-spark-job-sample.py:/opt/spark-apps/apache-spark-job-sample.py
+      - /home/pubudu/vernemq_config/sensor_data.csv:/opt/spark-apps/sensor_data.csv
+      - /home/pubudu/vernemq_config/spark-checkpoints:/opt/spark-apps/spark-checkpoints

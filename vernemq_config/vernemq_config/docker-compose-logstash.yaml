@@ -1,0 +1,7 @@
+services:
+  logstash:
+    image: logstash:7.17.22
+    ports:
+      - "5044:5044"
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf

@@ -1,0 +1,27 @@
+services:
+  elasticsearch:
+    image: arm64v8/elasticsearch:7.17.22
+    container_name: elasticsearch
+    platform: linux/arm64
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: arm64v8/kibana:7.17.22
+    container_name: kibana
+    platform: linux/arm64
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+volumes:
+  es_data:
+    driver: local
