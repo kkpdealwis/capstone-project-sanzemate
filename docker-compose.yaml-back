@@ -1,0 +1,158 @@
+
+version: '3'
+
+services:
+  vernemq:
+    image: vernemq/vernemq:latest
+    container_name: vernemq
+    environment:
+      - "DOCKER_VERNEMQ_ACCEPT_EULA=yes"
+      - "DOCKER_VERNEMQ_ALLOW_ANONYMOUS=off"
+      - "DOCKER_VERNEMQ_USER_admin=admin" # Replace 'admin' and 'password' with your desired username and password
+    ports:
+      - "1883:1883"  # MQTT port
+      - "8080:8080"  # HTTP management port (optional)
+      - "8883:8883"  # MQTT over TLS/SSL (optional)
+      - "8083:8083"  # WebSocket (optional)
+      - "8888:8888"  # WebSocket over TLS/SSL (optional)
+    volumes:
+      - vernemq_data:/vernemq/data
+      - vernemq_log:/vernemq/log
+      - vernemq_cert:/vernemq/etc/ssl # Optional, for SSL certificates
+
+  zoo1:
+    image: confluentinc/cp-zookeeper:7.3.2
+    hostname: zoo1
+    container_name: zoo1
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_SERVERS: zoo1:2888:3888
+
+  kafka1:
+    image: confluentinc/cp-kafka:7.3.2
+    hostname: kafka1
+    container_name: kafka1
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka1:19092,EXTERNAL://${DOCKER_HOST_IP}:9092,DOCKER://host.docker.internal:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: "zoo1:2181"
+      KAFKA_BROKER_ID: 1
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
+    depends_on:
+      - zoo1
+
+  kafka2:
+    image: confluentinc/cp-kafka:7.3.2
+    hostname: kafka2
+    container_name: kafka2
+    ports:
+      - "9093:9093"
+      - "29093:29093"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka2:19093,EXTERNAL://${DOCKER_HOST_IP}:9093,DOCKER://host.docker.internal:29093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: "zoo1:2181"
+      KAFKA_BROKER_ID: 2
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
+    depends_on:
+      - zoo1
+
+  kafka3:
+    image: confluentinc/cp-kafka:7.3.2
+    hostname: kafka3
+    container_name: kafka3
+    ports:
+      - "9094:9094"
+      - "29094:29094"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka3:19094,EXTERNAL://${DOCKER_HOST_IP}:9094,DOCKER://host.docker.internal:29094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,DOCKER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: "zoo1:2181"
+      KAFKA_BROKER_ID: 3
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
+    depends_on:
+      - zoo1
+
+  spark:
+    image: bitnami/spark:3.4.1
+    container_name: spark
+    ports:
+      - "4040:4040"  # Spark UI
+    environment:
+      SPARK_MODE: "master"
+      SPARK_MASTER_URL: "spark://spark:7077"
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    volumes:
+      - /home/pubudu/capstone-project/apache-spark-job.py:/opt/spark-apps/apache-spark-job.py
+      - /home/pubudu/capstone-project/apache-elastic-search-job.py:/opt/spark-apps/apache-elastic-search-job.py
+      - /home/pubudu/capstone-project/spark-checkpoints:/opt/spark-apps/spark-checkpoints
+      - /home/pubudu/capstone-project/es:/opt/spark-apps/es
+    command: 
+      - /bin/bash -c "sleep 120 && spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1 /opt/spark-apps/apache-spark-job.py"
+      - /bin/bash -c "sleep 120 && spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.elasticsearch:elasticsearch-spark-20_2.12:7.17.22 /opt/spark-apps/apache-elastic-search-job.py"
+
+  elasticsearch:
+    image: arm64v8/elasticsearch:7.17.22
+    container_name: elasticsearch
+    platform: linux/arm64
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: arm64v8/kibana:7.17.22
+    container_name: kibana
+    platform: linux/arm64
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  resource-monitor:
+    build: 
+      context: .
+      dockerfile: Dockerfile-RM
+    container_name: resource-monitor
+    environment:
+      MQTT_BROKER: "vernemq"
+      MQTT_TOPIC: "Resource/NodeMCU/Monitoring/#"
+      MQTT_USERNAME: "admin"
+      MQTT_PASSWORD: "admin"
+      KAFKA_BROKER: "kafka1:9092"
+      KAFKA_TOPIC: "logs"
+    depends_on:
+      - vernemq
+      - kafka1
+      - kafka2
+      - kafka3
+
+volumes:
+  vernemq_data:
+  vernemq_log:
+  vernemq_cert:
+  es_data:
+    driver: local

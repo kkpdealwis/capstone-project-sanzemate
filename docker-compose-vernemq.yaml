@@ -1,0 +1,24 @@
+version: '3'
+
+services:
+  vernemq:
+    image: vernemq/vernemq:latest
+    container_name: vernemq
+    environment:
+      - "DOCKER_VERNEMQ_ACCEPT_EULA=yes"
+      - "DOCKER_VERNEMQ_ALLOW_ANONYMOUS=off"
+      - "DOCKER_VERNEMQ_USER_admin=admin" # Replace 'admin' and 'password' with your desired username and password
+    ports:
+      - "1883:1883"  # MQTT port
+      - "8080:8080"  # HTTP management port (optional)
+      - "8883:8883"  # MQTT over TLS/SSL (optional)
+      - "8083:8083"  # WebSocket (optional)
+      - "8888:8888"  # WebSocket over TLS/SSL (optional)
+    volumes:
+      - vernemq_data:/vernemq/data
+      - vernemq_log:/vernemq/log
+      - vernemq_cert:/vernemq/etc/ssl # Optional, for SSL certificate
+volumes:
+  vernemq_data:
+  vernemq_log:
+  vernemq_cert:
